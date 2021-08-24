@@ -1,6 +1,6 @@
 # Deep Learning Model Compression
 
-Implementation of some model compression techniques:
+Implementation of some model compression techniques (using Pytorch):
 - Pruning
 - Quantization
 - Pruning (over iterations)
