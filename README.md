@@ -35,5 +35,5 @@ Model_2
 |...
 ```
 - metadata.json (include dataset information, model architecture, library version, etc)
-- parameters.json (learning rate, batch size, model architecture, pruning strenght, bit width)
+- parameters.json (learning rate, batch size, pruning strenght, bit width)
 - training_data.csv (training loss, test loss, trainig accuracy, test accuracy, model density)

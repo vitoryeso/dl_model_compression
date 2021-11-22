@@ -29,18 +29,30 @@ class cifar10:
         trainset = torchvision.datasets.CIFAR10(root=self.root_path, train=True,
                                                 download=True, transform=self.transform_train)
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=self.batch_size,
-                                                  shuffle=True, num_workers=2)
+                                                  shuffle=True, num_workers=0)
 
         testset = torchvision.datasets.CIFAR10(root=self.root_path, train=False,
                                                download=True, transform=self.transform_test)
         testloader = torch.utils.data.DataLoader(testset, batch_size=self.batch_size,
-                                                 shuffle=False, num_workers=2)
+                                                 shuffle=False, num_workers=0)
         return trainset, trainloader, testset, testloader
+
+    def get_loaders(self):
+        trainset = torchvision.datasets.CIFAR10(root=self.root_path, train=True,
+                                                download=True, transform=self.transform_train)
+        trainloader = torch.utils.data.DataLoader(trainset, batch_size=self.batch_size,
+                                                  shuffle=True, num_workers=0)
+
+        testset = torchvision.datasets.CIFAR10(root=self.root_path, train=False,
+                                               download=True, transform=self.transform_test)
+        testloader = torch.utils.data.DataLoader(testset, batch_size=self.batch_size,
+                                                 shuffle=False, num_workers=0)
+        return trainloader, testloader
 
 
     def get_testdata(self):
         testset = torchvision.datasets.CIFAR10(root=self.root_path, train=False,
                                                download=True, transform=self.transform_test)
         testloader = torch.utils.data.DataLoader(testset, batch_size=self.batch_size,
-                                                 shuffle=False, num_workers=2)
+                                                 shuffle=False, num_workers=0)
         return testset, testloader

@@ -1,3 +1,5 @@
+import torch
+
 def pruning(model, gamma):
     if gamma > 0.0:
         with torch.no_grad():
