@@ -10,22 +10,22 @@ Model_1
 |________metadata.json
 |________training_1
 |        |__________parameters.json
-|        |__________best_weights.h5
+|        |__________best_weights.pth
 |        |__________training_data.csv
 |________training_2
 |        |__________parameters.json
-|        |__________best_weights.h5
+|        |__________best_weights.pth
 |        |__________training_data.csv
 |        ...
 Model_2
 |________metadata.json
 |________training_1
 |        |__________parameters.json
-|        |__________best_weights.h5
+|        |__________best_weights.pth
 |        |__________training_data.csv
 |________training_2
 |        |__________parameters.json
-|        |__________best_weights.h5
+|        |__________best_weights.pth
 |        |__________training_data.csv
 |        ...
 |...
