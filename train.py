@@ -130,25 +130,24 @@ if __name__ == "__main__":
     data_path = "./data"
 
     dataset = cifar10(data_path, batch_size, data_augmentation=True)
-    del dataset;
-
     trainloader, testloader = dataset.get_loaders()
+    del dataset;
 
     loss_func = F.cross_entropy
 
     hyper_parameters_comb = get_param_comb([0.25, 0.5, 0.75],
-                                       [3, 4, 8, 16])
+                                       [3])
 
-    EPOCHS = 300
-    for parameter_set in hyper_parameters_comb:
-        for i, hyper_parameters in enumerate(parameter_set):
+    EPOCHS = 200
+    for i, parameter_set in enumerate(hyper_parameters_comb):
+        for hyper_parameters in parameter_set:
             lr, gamma, b = hyper_parameters
             print(f"""Starting a new train <<<<<<<<<<<<<<<<
                     GAMMA: {gamma},
                     BIT WIDTH: {b},
                     LEARNING RATE: {lr}
             """)
-            metadata_path = models_path + f"training_{i}/"
+            metadata_path = models_path + f"training_{i + 1}/"
 
             save_best_model = SaveBestModel(metadata_path)
 
