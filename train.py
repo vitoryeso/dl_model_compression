@@ -40,6 +40,7 @@ def fit_pruning(net, epochs, optimizer, gamma, b, learning_rate, loss_fn, train_
             # passing input data to the dev(GPU) memory
             inputs, labels = data[0].to(dev), data[1].to(dev)
 
+            betas = []
             # >>> PRUNING <<<
             if gamma>0.0:
                 betas = pruning(net, gamma)
