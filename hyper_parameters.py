@@ -10,7 +10,7 @@ def get_param_comb(pruning_parameters, quantization_parameters):
     for param in parameters:
         param_list = []
         #for lr in [0.01, 0.05, 0.07, 0.1]:
-        for lr in [0.10, 0.05, 0.07, 0.09]:
+        for lr in [ 0.015]:
             item = (lr, ) + param
             param_list.append(item)
 

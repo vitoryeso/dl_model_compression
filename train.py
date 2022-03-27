@@ -135,12 +135,18 @@ if __name__ == "__main__":
 
     loss_func = F.cross_entropy
 
-    hyper_parameters_comb = get_param_comb([0.25, 0.5, 0.75],
-                                       [3])
+    hyper_parameters_comb = get_param_comb([0.0, 0.25, 0.5, 0.75],
+                                       [32, 16, 8, 4, 3])
 
+    count = 0
     EPOCHS = 200
     for i, parameter_set in enumerate(hyper_parameters_comb):
         for hyper_parameters in parameter_set:
+            if count < 1:
+                count += 1;
+                continue;
+            else: count += 1;
+            
             lr, gamma, b = hyper_parameters
             print(f"""Starting a new train <<<<<<<<<<<<<<<<
                     GAMMA: {gamma},
