@@ -164,7 +164,8 @@ if __name__ == "__main__":
             model = convModel()
             model.to(dev) # pass model to GPU memory
             model.apply(init_bias_weights) # init bias weights to avoid NaN
-            opt = optim.Adam(model.parameters(), lr=lr)
+            #opt = optim.Adam(model.parameters(), lr=lr)
+            opt = optim.SGD(model.parameters(), lr, momentum=0.9)
 
             #def fit_pruning(net, optimizer, epochs, gamma, b, pruning_rate, loss_fn, train_dl, test_dl):
             training_metadata = fit_pruning(model, 
