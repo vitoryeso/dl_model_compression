@@ -6,13 +6,14 @@ from src.utils import accuracy, density, init_bias_weights, plot_data
 from src.utils import save_data_experiment, save_training_parameters, SaveBestModel
 from hyper_parameters import get_param_comb
 
+from statistics import mean as mean
 import os
 import torch
 import torch.nn.functional as F
 
 from torch import optim
 
-def fit_pruning(net, epochs, optimizer, gamma, b, learning_rate, loss_fn, train_dl, test_dl):
+def fit_pruning(net, epochs, optimizer, gamma, b, learning_rate, loss_fn, train_dl, test_dl, early_stoppin=True):
     train_losses = []
     test_losses = []
     train_accuracies = []
@@ -100,7 +101,7 @@ def fit_pruning(net, epochs, optimizer, gamma, b, learning_rate, loss_fn, train_
         test_loss /= len(test_dl)
         test_acc /= len(test_dl)
         dst = density(net)
-        
+
         train_losses.append(train_loss)
         train_accuracies.append(train_acc)
         test_losses.append(test_loss)
@@ -115,6 +116,11 @@ def fit_pruning(net, epochs, optimizer, gamma, b, learning_rate, loss_fn, train_
             (epoch + 1, epochs, train_loss, train_acc, test_acc, dst))
 
         save_best_model(test_acc, epoch, model)
+
+        if epoch > 5:
+            if early_stoppin and mean(train_accuracies[-5:-1]) <= 0.15:
+                print(f'Early Stopping at epoch: {epoch + 1}. Going to the next parameter combination.')
+                return train_losses, train_accuracies, test_losses, test_accuracies, densities
         
 
     print('Finished Training')
