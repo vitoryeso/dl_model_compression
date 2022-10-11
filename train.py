@@ -31,28 +31,11 @@ def fit_pruning(net, epochs, optimizer, gamma, b, learning_rate, loss_fn, train_
         # setting the model to training mode
         net.train()
 
-        # save pruning only model weights
-        model_copy = type(net)()
-        model_copy.to(dev)
-
         # TRAIN LOOP
         for i, data in enumerate(train_dl):
             # get the inputs; data is a list of [inputs, labels]
             # passing input data to the dev(GPU) memory
             inputs, labels = data[0].to(dev), data[1].to(dev)
-
-            betas = []
-            # >>> PRUNING <<<
-            if gamma>0.0:
-                betas = pruning(net, gamma)
-
-            # copy only pruninig weights
-            model_copy.load_state_dict(net.state_dict())
-            pesos_pruned = list(model_copy.parameters())
-
-            # >>> QUANTIZATION <<<
-            if b>0:
-                quantization(net, b, betas)
 
             # forward
             outputs = net(inputs)
@@ -63,17 +46,16 @@ def fit_pruning(net, epochs, optimizer, gamma, b, learning_rate, loss_fn, train_
             # loss backward. grads are generated here
             loss.backward()
             
-            # if no compression, perform default optimization
-            if compression:
-                with torch.no_grad():
-                    for p_net, p_pruning in zip(net.parameters(), pesos_pruned):
-                        #p_pruning.subtract(p_net.grad * 0.05)
-                        #pesos = pesos_pruning - learning_rate*p_net.grad
-                        torch.subtract(p_pruning, p_net.grad * learning_rate, out=p_net)
-                    net.zero_grad()
-            else:
-                optimizer.step()
-                optimizer.zero_grad()
+            optimizer.step()
+            optimizer.zero_grad()
+
+            # >>> PRUNING <<<
+            betas = []
+            if gamma>0.0:
+                betas = pruning(net, gamma)
+            # >>> QUANTIZATION <<<
+            if b>0:
+                quantization(net, b, betas)
                 
             train_loss += loss.item()  
             train_acc += accuracy(outputs, labels).item()

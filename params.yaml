@@ -1,0 +1,9 @@
+train:
+  batch_size: 64
+  epochs: 100
+  # some tolerance optimization metric
+  compression:
+    betas: [0.25, 0.5, 0.75]
+    b: [32, 16, 8, 4, 3]
+  optimizer:
+    learning_rate: [0.001, 0.01, 0.1]
