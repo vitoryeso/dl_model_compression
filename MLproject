@@ -1,0 +1,13 @@
+name: cifar10_compression
+
+conda_env: conda.yaml
+
+entry_points:
+  main:
+    parameters:
+      hydra_options:
+        description: Hydra parameters to override
+        type: str
+        default: ''
+    command: >-
+      python train.py $(echo {hydra_options}) 

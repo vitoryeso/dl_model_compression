@@ -1,7 +1,6 @@
 from src.compression import pruning, quantization
 from src.cifar10 import cifar10
 from src.model import convModel
-
 from src.utils import accuracy, density, init_bias_weights, plot_data
 from src.utils import save_data_experiment, save_training_parameters, SaveBestModel
 from hyper_parameters import get_param_comb
@@ -10,8 +9,13 @@ from statistics import mean as mean
 import os
 import torch
 import torch.nn.functional as F
-
 from torch import optim
+import argparse
+from tqdm import tqdm
+import logging
+import wandb
+import hydra
+from omegaconf import DictConfig
 
 def fit_pruning(net, epochs, optimizer, gamma, b, learning_rate, loss_fn, train_dl, test_dl, early_stoppin=True):
     train_losses = []
@@ -19,7 +23,9 @@ def fit_pruning(net, epochs, optimizer, gamma, b, learning_rate, loss_fn, train_
     train_accuracies = []
     test_accuracies = []
     densities = []
-
+    
+    logging.info("Starting training...")
+    
     for epoch in range(epochs):
         train_loss = 0.0
         test_loss = 0.0
@@ -36,66 +42,60 @@ def fit_pruning(net, epochs, optimizer, gamma, b, learning_rate, loss_fn, train_
         model_copy.to(dev)
 
         # TRAIN LOOP
-        for i, data in enumerate(train_dl):
-            # get the inputs; data is a list of [inputs, labels]
-            # passing input data to the dev(GPU) memory
+        train_pbar = tqdm(train_dl, desc=f'Epoch {epoch+1}/{epochs} [Train]')
+        for i, data in enumerate(train_pbar):
             inputs, labels = data[0].to(dev), data[1].to(dev)
 
+            # 1. First, calculate pruning masks (betas)
             betas = []
-            # >>> PRUNING <<<
-            if gamma>0.0:
+            if gamma > 0.0:
                 betas = pruning(net, gamma)
 
-            # copy only pruninig weights
+            # 2. Save a copy of the original weights before compression
             model_copy.load_state_dict(net.state_dict())
             pesos_pruned = list(model_copy.parameters())
 
-            # >>> QUANTIZATION <<<
-            if b>0:
+            # 3. Apply quantization (if enabled)
+            if b > 0:
                 quantization(net, b, betas)
 
-            # forward
+            # 4. Forward pass with compressed weights
             outputs = net(inputs)
-            
-            # loss calculation
             loss = loss_fn(outputs, labels)
-            
-            # loss backward. grads are generated here
             loss.backward()
-            
-            # if no compression, perform default optimization
+
             if compression:
+                # Custom weight update using the original (uncompressed) weights
                 with torch.no_grad():
                     for p_net, p_pruning in zip(net.parameters(), pesos_pruned):
-                        #p_pruning.subtract(p_net.grad * 0.05)
-                        #pesos = pesos_pruning - learning_rate*p_net.grad
                         torch.subtract(p_pruning, p_net.grad * learning_rate, out=p_net)
                     net.zero_grad()
             else:
+                # Standard optimization if no compression
                 optimizer.step()
                 optimizer.zero_grad()
                 
             train_loss += loss.item()  
             train_acc += accuracy(outputs, labels).item()
+            
+            train_pbar.set_postfix({'loss': f'{loss.item():.3f}'})
 
-        # final compression (after entire epoch)
         if compression:
             betas = pruning(net, gamma)
             quantization(net, b, betas)
 
-        # change the model to the inference mode
         net.eval()
 
         # TEST STEP
-        for i, data in enumerate(test_dl):
+        test_pbar = tqdm(test_dl, desc=f'Epoch {epoch+1}/{epochs} [Test]')
+        for i, data in enumerate(test_pbar):
             inputs, labels = data[0].to(dev), data[1].to(dev)
 
             with torch.no_grad():
                 outputs = net(inputs)
             test_loss += loss_fn(outputs, labels).item()
             test_acc += accuracy(outputs, labels).item()
-            
-        # getting model train metadata
+
         train_loss /= len(train_dl)
         train_acc /= len(train_dl)
         test_loss /= len(test_dl)
@@ -108,85 +108,68 @@ def fit_pruning(net, epochs, optimizer, gamma, b, learning_rate, loss_fn, train_
         test_accuracies.append(test_acc)
         densities.append(density(net))
         
-        print('Epoch: %d/%d \
-               train loss: %.3f \
-               train accuracy: %.3f \
-               test accuracy: %.3f \
-               density: %.3f' %
-            (epoch + 1, epochs, train_loss, train_acc, test_acc, dst))
+        logging.info(f'Epoch: {epoch + 1}/{epochs} | '
+                    f'Train Loss: {train_loss:.3f} | '
+                    f'Train Acc: {train_acc:.3f} | '
+                    f'Test Acc: {test_acc:.3f} | '
+                    f'Density: {dst:.3f}')
 
         save_best_model(test_acc, epoch, model)
 
         if epoch > 5:
             if early_stoppin and mean(train_accuracies[-5:-1]) <= 0.15:
-                print(f'Early Stopping at epoch: {epoch + 1}. Going to the next parameter combination.')
+                logging.info(f'Early Stopping at epoch: {epoch + 1}. Going to next parameter combination.')
                 return train_losses, train_accuracies, test_losses, test_accuracies, densities
-        
 
-    print('Finished Training')
+    logging.info('Finished Training')
     return train_losses, train_accuracies, test_losses, test_accuracies, densities
 
-if __name__ == "__main__":
-    dev = torch.device(
-            "cuda") if torch.cuda.is_available() else torch.device("cpu")
-    print("USING ",dev," DEVICE!")
-    batch_size = 256
-    lr = 0.075
-    models_path = "./models/model_cifar10/"
+@hydra.main(config_path="conf", config_name="config")
+def main(cfg: DictConfig):
+    # Initialize W&B
+    wandb.init(
+        project=cfg.wandb.project,
+        entity=cfg.wandb.entity,
+        tags=cfg.wandb.tags,
+        config=dict(cfg)
+    )
 
-    data_path = "./data"
+    dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logging.info(f"Using {dev} device")
 
-    dataset = cifar10(data_path, batch_size, data_augmentation=True)
+    if not os.path.exists(cfg.training.models_path):
+        os.makedirs(cfg.training.models_path)
+
+    dataset = cifar10(cfg.training.data_path, cfg.optimization.batch_size, data_augmentation=True)
     trainloader, testloader = dataset.get_loaders()
-    del dataset;
+    del dataset
 
     loss_func = F.cross_entropy
+    
+    # Setup early stopping
+    early_stopping = EarlyStopping(
+        patience=cfg.training.early_stopping_patience,
+        min_delta=cfg.training.early_stopping_min_delta
+    )
 
-    hyper_parameters_comb = get_param_comb([0.25, 0.5, 0.75],
-                                       [32, 16, 8, 4, 3])
+    model = convModel()
+    model.to(dev)
+    model.apply(init_bias_weights)
+    opt = optim.SGD(model.parameters(), 
+                    cfg.optimization.lr, 
+                    momentum=cfg.optimization.momentum)
 
-    count = 0
-    EPOCHS = 60
-    for i, parameter_set in enumerate(hyper_parameters_comb):
-        for hyper_parameters in parameter_set:
-            """ 
-            if count < 1:
-                count += 1;
-                continue;
-            else: count += 1;
-            """ 
-            
-            lr, gamma, b = hyper_parameters
-            print(f"""Starting a new train <<<<<<<<<<<<<<<<
-                    GAMMA: {gamma},
-                    BIT WIDTH: {b},
-                    LEARNING RATE: {lr},
-                    BATCH SIZE: {batch_size}
-            """)
-            metadata_path = models_path + f"training_{i + 1}/"
+    training_metadata = fit_pruning(model, 
+                                  cfg.training.epochs,
+                                  opt,
+                                  cfg.compression.gamma,
+                                  cfg.compression.bits,
+                                  cfg.optimization.lr,
+                                  loss_func,
+                                  trainloader,
+                                  testloader)
 
-            save_best_model = SaveBestModel(metadata_path)
+    # ... rest of your training code ...
 
-            if not os.path.isdir(metadata_path):
-                os.mkdir(metadata_path)
-
-            model = convModel()
-            model.to(dev) # pass model to GPU memory
-            model.apply(init_bias_weights) # init bias weights to avoid NaN
-            #opt = optim.Adam(model.parameters(), lr=lr)
-            opt = optim.SGD(model.parameters(), lr, momentum=0.9)
-
-            #def fit_pruning(net, optimizer, epochs, gamma, b, pruning_rate, loss_fn, train_dl, test_dl):
-            training_metadata = fit_pruning(model, 
-                                            EPOCHS, 
-                                            opt, 
-                                            gamma, 
-                                            b, 
-                                            lr, 
-                                            loss_func, 
-                                            trainloader, testloader)
-
-            #train_loss, test_loss, train_acc, test_acc, densities = training_metadata
-            save_data_experiment(metadata_path, training_metadata)
-            save_training_parameters(metadata_path,lr, batch_size, gamma, b)
-
+if __name__ == "__main__":
+    main()

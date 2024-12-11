@@ -1,0 +1,17 @@
+name: cifar10_compression
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.8
+  - pytorch
+  - torchvision
+  - cudatoolkit
+  - pip
+  - pip:
+    - hydra-core
+    - wandb
+    - tqdm
+    - matplotlib 
+    - pandas

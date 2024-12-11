@@ -30,6 +30,8 @@ def pruning(model, gamma):
 # quando varremos os parametros do modelo com model.parameters() temos que verificar o shape do tensor.
 # pq pode ser q o tensor seja so um unico valor como um bias por exemplo e nao vai fazer sentido o desvio padrao desse unico valor.
 def quantization(model, b, betas=[]):
+    # aqui o beta eh usado, pois a quantização usa o mesmo valor em sua formula mesmo. eh pra simplificar a computacao.
+    # podemos tambem fazer a funcao pruning_followed_by_quantiztion
     if b >= 1:
         # aqui pode ser uma flag que diz se o pruning foi feito ou não
         if len(betas) > 0:
